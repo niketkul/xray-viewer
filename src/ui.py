@@ -2,18 +2,19 @@ import sys
 from PySide6.QtCore import (
     QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
-    QSize, QTime, QUrl, Qt
+    QSize, QTime, QUrl, Qt, Slot
 )
 from PySide6.QtGui import (
     QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
-    QPalette, QPixmap, QRadialGradient, QTransform
+    QPalette, QPixmap, QRadialGradient, QTransform, 
+    QImageReader
 )
 from PySide6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QMainWindow,
     QMenuBar, QPushButton, QSizePolicy, QSlider,
-    QStatusBar, QVBoxLayout, QWidget
+    QStatusBar, QVBoxLayout, QWidget, QFileDialog
 )
 
 class UIMainWindow(QMainWindow):
@@ -125,6 +126,7 @@ class UIMainWindow(QMainWindow):
         self.loadButton = QPushButton(self.buttonAreaContainer)
         self.loadButton.setObjectName("loadButton")
         self.loadButton.setMinimumSize(QSize(203, 45))
+        self.loadButton.clicked.connect(self.openFileDialog)
 
         self.saveButton = QPushButton(self.buttonAreaContainer)
         self.saveButton.setObjectName("saveButton")
@@ -142,3 +144,18 @@ class UIMainWindow(QMainWindow):
         self.contrastSliderWidget.label.setText(QCoreApplication.translate("MainWindow", "Contrast", None))
         self.loadButton.setText(QCoreApplication.translate("MainWindow", "Load Image", None))
         self.saveButton.setText(QCoreApplication.translate("MainWindow", "Save Image", None))
+
+    @Slot()
+    def openFileDialog(self) -> None:
+        dialog = QFileDialog(self.centralwidget)
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dialog.setViewMode(QFileDialog.Detail)
+        dialog.setNameFilter("Image Files (*.png *.jpg *.jpeg *.bmp);;All Files (*)")
+        file_path, _ = dialog.getOpenFileName(self, "Open Image", "", "Image Files (*.png *.jpg *.jpeg *.bmp)")
+
+        if file_path: 
+            pixmap = QPixmap(file_path)
+            if not pixmap.isNull():
+                self.imageLabel.setPixmap(pixmap)
+            else:
+                self.imageLabel.setText("Failed to load image")
