@@ -65,6 +65,7 @@ class UIMainWindow(QMainWindow):
         self.imageLabel.setSizePolicy(sizePolicy)
         self.imageLabel.setMinimumSize(QSize(502, 511))
         self.imageLabel.setMargin(10)
+        self.imageLabel.setScaledContents(True)
         self.mainHorizontalLayout.addWidget(self.imageLabel)
 
     # Setup the area where the sliders and button controls will be displayed
@@ -155,7 +156,12 @@ class UIMainWindow(QMainWindow):
 
         if file_path: 
             pixmap = QPixmap(file_path)
-            if not pixmap.isNull():
-                self.imageLabel.setPixmap(pixmap)
-            else:
+            if pixmap.isNull():
                 self.imageLabel.setText("Failed to load image")
+            else:
+                scaled_pixmap = pixmap.scaled(
+                    self.imageLabel.size(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                self.imageLabel.setPixmap(scaled_pixmap)
