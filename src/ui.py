@@ -1,8 +1,11 @@
 import sys
+import cv2
+import numpy as np
+
 from PySide6.QtCore import (
     QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
-    QSize, QTime, QUrl, Qt, Slot
+    QSize, QTime, QUrl, Qt, Slot, Signal
 )
 from PySide6.QtGui import (
     QBrush, QColor, QConicalGradient, QCursor,
@@ -18,6 +21,8 @@ from PySide6.QtWidgets import (
 )
 
 class UIMainWindow(QMainWindow):
+    imageUpdated = Signal(int, str)
+
     def setupUi(self, mainWindow: QMainWindow) -> None:
         if not mainWindow.objectName():
             mainWindow.setObjectName("mainWindow")
@@ -66,7 +71,35 @@ class UIMainWindow(QMainWindow):
         self.imageLabel.setMinimumSize(QSize(502, 511))
         self.imageLabel.setMargin(10)
         self.imageLabel.setScaledContents(True)
+        self.imageUpdated.connect(self.processImage)
         self.mainHorizontalLayout.addWidget(self.imageLabel)
+    
+    @Slot(int, str)
+    def processImage(self, value: int, adjustment_type: str) -> None:
+        # Do nothing if image has not been loaded
+        if not hasattr(self, "original_image") or self.original_image is None:
+            print("No image loaded")
+            return
+        
+        print("processImage")
+        new_pixmap = self.getNewPixmap(value, adjustment_type)
+        self.imageLabel.setPixmap(new_pixmap)
+
+    def getNewPixmap(self, value: int, adjustment_type: str) -> QPixmap:
+        print("getNewPixmap")
+        if adjustment_type == "Brightness":
+            alpha = 1.0 
+            beta = value
+        elif adjustment_type == "Contrast":
+            alpha = 1.0 + (value / 100.0)
+            beta = 0
+
+        self.processed_image = cv2.convertScaleAbs(self.original_image, alpha=alpha, beta=beta)
+
+        height, width, channel = self.processed_image.shape
+        bytes_per_line = 3 * width
+        qimage = QImage(self.processed_image.data, width, height, bytes_per_line, QImage.Format_RGB888)
+        return QPixmap.fromImage(qimage)
 
     # Setup the area where the sliders and button controls will be displayed
     def setupControlArea(self) -> None:
@@ -89,6 +122,8 @@ class UIMainWindow(QMainWindow):
         self.sliderAreaHorizontalLayout.setObjectName("sliderAreaHorizontalLayout")
 
         class LabeledSlider(QWidget):
+            sliderChanged = Signal(int, str)
+
             def __init__(self, label_text: str, parent: QWidget = None) -> None:
                 super().__init__(parent)
                 self.setObjectName(f"{label_text.lower()}Container")
@@ -105,10 +140,29 @@ class UIMainWindow(QMainWindow):
                 self.slider = QSlider(self)
                 self.slider.setObjectName(f"{label_text.lower()}Slider")
                 self.slider.setOrientation(Qt.Orientation.Vertical)
+
+                self.slider.setRange(-100, 100)
+                self.slider.setValue(0)
+                self.slider.setTickPosition(QSlider.TickPosition.TicksBothSides)
+                self.slider.setTickInterval(100)
+                self.slider.setSingleStep(1)
+                
+                self.slider.valueChanged.connect(self.adjustImage)
                 self.verticalLayout.addWidget(self.slider)
+            
+            @Slot(int)
+            def adjustImage(self, value: int) -> None:  
+                print("adjustImage")    
+                if self.label.text() == "Brightness":
+                    self.sliderChanged.emit(value, "Brightness")
+                elif self.label.text() == "Contrast":
+                    self.sliderChanged.emit(value, "Contrast")
 
         self.brightnessSliderWidget = LabeledSlider("Brightness", self.sliderAreaContainer)
         self.contrastSliderWidget = LabeledSlider("Contrast", self.sliderAreaContainer)
+
+        self.brightnessSliderWidget.sliderChanged.connect(self.imageUpdated.emit)
+        self.contrastSliderWidget.sliderChanged.connect(self.imageUpdated.emit)
 
         self.sliderAreaHorizontalLayout.addWidget(self.brightnessSliderWidget)
         self.sliderAreaHorizontalLayout.addWidget(self.contrastSliderWidget)
@@ -138,13 +192,13 @@ class UIMainWindow(QMainWindow):
         
         self.controlAreaVerticalLayout.addWidget(self.buttonAreaContainer)
 
-    def retranslateUi(self, MainWindow: QMainWindow) -> None:
-        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", "X-Ray Image Processor", None))
-        self.imageLabel.setText(QCoreApplication.translate("MainWindow", "No Image Selected", None))
-        self.brightnessSliderWidget.label.setText(QCoreApplication.translate("MainWindow", "Brightness", None))
-        self.contrastSliderWidget.label.setText(QCoreApplication.translate("MainWindow", "Contrast", None))
-        self.loadButton.setText(QCoreApplication.translate("MainWindow", "Load Image", None))
-        self.saveButton.setText(QCoreApplication.translate("MainWindow", "Save Image", None))
+    def retranslateUi(self, mainWindow: QMainWindow) -> None:
+        mainWindow.setWindowTitle(QCoreApplication.translate("mainWindow", "X-Ray Image Processor", None))
+        self.imageLabel.setText(QCoreApplication.translate("mainWindow", "No Image Selected", None))
+        self.brightnessSliderWidget.label.setText(QCoreApplication.translate("mainWindow", "Brightness", None))
+        self.contrastSliderWidget.label.setText(QCoreApplication.translate("mainWindow", "Contrast", None))
+        self.loadButton.setText(QCoreApplication.translate("mainWindow", "Load Image", None))
+        self.saveButton.setText(QCoreApplication.translate("mainWindow", "Save Image", None))
 
     @Slot()
     def openFileDialog(self) -> None:
@@ -159,6 +213,8 @@ class UIMainWindow(QMainWindow):
             if pixmap.isNull():
                 self.imageLabel.setText("Failed to load image")
             else:
+                self.original_image = cv2.imread(file_path)
+                self.original_image = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
                 scaled_pixmap = pixmap.scaled(
                     self.imageLabel.size(),
                     Qt.AspectRatioMode.KeepAspectRatio,
