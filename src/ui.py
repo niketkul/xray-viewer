@@ -186,19 +186,12 @@ class UIMainWindow(QMainWindow):
         self.saveButton = QPushButton(self.buttonAreaContainer)
         self.saveButton.setObjectName("saveButton")
         self.saveButton.setMinimumSize(QSize(203, 45))
+        self.saveButton.clicked.connect(self.saveImage)
 
         self.buttonAreaVerticalLayout.addWidget(self.loadButton)
         self.buttonAreaVerticalLayout.addWidget(self.saveButton)
         
         self.controlAreaVerticalLayout.addWidget(self.buttonAreaContainer)
-
-    def retranslateUi(self, mainWindow: QMainWindow) -> None:
-        mainWindow.setWindowTitle(QCoreApplication.translate("mainWindow", "X-Ray Image Processor", None))
-        self.imageLabel.setText(QCoreApplication.translate("mainWindow", "No Image Selected", None))
-        self.brightnessSliderWidget.label.setText(QCoreApplication.translate("mainWindow", "Brightness", None))
-        self.contrastSliderWidget.label.setText(QCoreApplication.translate("mainWindow", "Contrast", None))
-        self.loadButton.setText(QCoreApplication.translate("mainWindow", "Load Image", None))
-        self.saveButton.setText(QCoreApplication.translate("mainWindow", "Save Image", None))
 
     @Slot()
     def openFileDialog(self) -> None:
@@ -221,3 +214,37 @@ class UIMainWindow(QMainWindow):
                     Qt.TransformationMode.SmoothTransformation
                 )
                 self.imageLabel.setPixmap(scaled_pixmap)
+
+    @Slot()
+    def saveImage(self) -> None:
+        dialog = QFileDialog(self.centralwidget)
+        dialog.setFileMode(QFileDialog.FileMode.AnyFile)
+        dialog.setViewMode(QFileDialog.Detail)
+        dialog.setNameFilter("PNG Files (*.png);;JPEG Files (*.jpg *.jpeg);;BMP Files (*.bmp)")
+        file_path, _ = dialog.getSaveFileName(self, "Save Image", "", "PNG Files (*.png);;JPEG Files (*.jpg *.jpeg);;BMP Files (*.bmp)")
+
+        if file_path:
+            try:
+                if not hasattr(self, "original_image") or self.original_image is None:
+                    self.imageLabel.setText("No image to save")
+                else:
+                    current_pixmap = self.imageLabel.pixmap()
+                    if current_pixmap:
+                        qimage = current_pixmap.toImage()
+
+                        if not file_path.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')):
+                            file_path += '.jpg'
+                        qimage.save(file_path)
+                        print(f"Image successfully saved to {file_path}")
+            except Exception as e:
+                print(f"Error saving image: {e}")
+
+        
+
+    def retranslateUi(self, mainWindow: QMainWindow) -> None:
+        mainWindow.setWindowTitle(QCoreApplication.translate("mainWindow", "X-Ray Image Processor", None))
+        self.imageLabel.setText(QCoreApplication.translate("mainWindow", "No Image Selected", None))
+        self.brightnessSliderWidget.label.setText(QCoreApplication.translate("mainWindow", "Brightness", None))
+        self.contrastSliderWidget.label.setText(QCoreApplication.translate("mainWindow", "Contrast", None))
+        self.loadButton.setText(QCoreApplication.translate("mainWindow", "Load Image", None))
+        self.saveButton.setText(QCoreApplication.translate("mainWindow", "Save Image", None))
